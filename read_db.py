@@ -1,9 +1,18 @@
-import sqlite3
+from pymongo import MongoClient
+from pprint import pprint
 
-conn = sqlite3.connect("sbt1.db")
-c = conn.cursor()
+# Connect to local MongoDB
+client = MongoClient("mongodb://localhost:27017/")
 
-for row in c.execute("SELECT address, score, amount FROM traits"):
-    print(row)
+# Select database and collections
+db = client["xian_monitor"]
+traits_col = db["traits"]
+processed_col = db["processed"]
 
-conn.close()
+print("\n📜 --- TRAITS COLLECTION ---")
+for doc in traits_col.find():
+    pprint(doc)
+
+print("\n📜 --- PROCESSED TXS COLLECTION ---")
+for doc in processed_col.find():
+    pprint(doc)

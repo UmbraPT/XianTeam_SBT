@@ -1,57 +1,51 @@
 import requests
 import sqlite3
 import time
+from pymongo import MongoClient
 
 GRAPHQL_URL = "https://devnet.xian.org/graphql"
 CONTRACT_NAME = "con_sbtxian"
 SBT_REFRESH_INTERVAL = 60 
 
+client = MongoClient("mongodb://localhost:27017/")
+db = client["xian_monitor"]
+traits_col = db["traits"]
+processed_col = db["processed"]
+
+traits_col.create_index("address", unique=True)
+processed_col.create_index("tx_hash", unique=True)
+
 def setup_db():
-    conn = sqlite3.connect("sbt3.db")
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS traits (
-            address TEXT PRIMARY KEY,
-            score INTEGER DEFAULT 0,
-            amount REAL DEFAULT 0.0
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS processed (
-            tx_hash TEXT PRIMARY KEY
-        )
-    """)
-    conn.commit()
-    conn.close()
+   """No schema setup needed for MongoDB, but we'll ensure indexes exist."""
+   traits_col.create_index("address", unique=True)
+   processed_col.create_index("tx_hash", unique=True)
 
 def ensure_user_exists(address):
-    conn = sqlite3.connect("sbt3.db")
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO traits (address) VALUES (?)", (address,))
-    conn.commit()
-    conn.close()
+    """Ensure a user exists in the traits collection."""
+    traits_col.update_one(
+        {"address": address},
+        {"$setOnInsert": {"score": 0, "amount": 0.0}},
+        upsert=True
+    )
 
 def has_processed(tx_hash):
-    conn = sqlite3.connect("sbt3.db")
-    c = conn.cursor()
-    c.execute("SELECT 1 FROM processed WHERE tx_hash = ?", (tx_hash,))
-    result = c.fetchone()
-    conn.close()
-    return result is not None
+    """Check if a transaction hash is already processed."""
+    return processed_col.count_documents({"tx_hash": tx_hash}, limit=1) > 0
 
 def mark_processed(tx_hash):
-    conn = sqlite3.connect("sbt3.db")
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO processed (tx_hash) VALUES (?)", (tx_hash,))
-    conn.commit()
-    conn.close()
+    """Mark a transaction as processed."""
+    try:
+        processed_col.insert_one({"tx_hash": tx_hash})
+    except Exception:
+        # Ignore duplicate key errors
+        pass
 
 def increment_score_and_amount(address, score, amount):
-    conn = sqlite3.connect("sbt3.db")
-    c = conn.cursor()
-    c.execute("UPDATE traits SET score = score + ?, amount = amount + ? WHERE address = ?", (score, amount, address))
-    conn.commit()
-    conn.close()
+    """Increment a user's score and amount."""
+    traits_col.update_one(
+        {"address": address},
+        {"$inc": {"score": score, "amount": amount}}
+    )
 
 def get_all_sbt_holders():
     query = {
@@ -175,7 +169,7 @@ def main_loop():
 
         for tx_hash, sender, score, amount in all_events:
             if sender not in sbt_holders:
-                print(f"⛔ Ignored {sender} (no SBT)")
+            #    print(f"⛔ Ignored {sender} (no SBT)")
                 continue
 
             if has_processed(tx_hash):
