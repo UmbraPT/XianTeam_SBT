@@ -1,78 +1,89 @@
-from flask import Flask, request, jsonify
-import sqlite3
+from flask import Flask, request, jsonify, send_from_directory
+from pymongo import MongoClient
 import requests
+import os
+
+# ---- config ----
+MONGO_URI = "mongodb://localhost:27017/"
+MONGO_DB = "xian_monitor"
+TRAITS_COLLECTION = "traits"
 
 GRAPHQL_URL = "https://devnet.xian.org/graphql"
-CONTRACT_NAME = "con_sbtxian"  # Your deployed traits contract
-DB_PATH = "sbt1.db"
-
-app = Flask(__name__)
-
-# Ordered keys
+SBT_CONTRACT = "con_sbtxian"   # your merged contract name
 TRAIT_KEYS = ["Score", "Tier", "Stake Duration", "DEX Volume", "Game Wins", "Bots Created", "Pulse Influence"]
 
-def get_traits_from_db(user_address):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT score FROM traits WHERE address = ?", (user_address,))
-    row = c.fetchone()
-    conn.close()
+# ---- app ----
+app = Flask(
+    __name__,
+    static_folder="public",     # serve /public as static root
+    static_url_path=""          # so /index.html is at /
+)
 
-    traits = {}
-    for key in TRAIT_KEYS:
-        if key == "Score" and row:
-            traits[key] = row[0]
-        else:
-            traits[key] = 0
-    return traits
+# ---- db ----
+client = MongoClient(MONGO_URI)
+db = client[MONGO_DB]
+traits_col = db[TRAITS_COLLECTION]
 
-def get_traits_from_chain(user_address):
-    query = {
+def get_offchain_traits(address: str):
+    doc = traits_col.find_one({"address": address}, {"_id": 0, "score": 1})
+    score = int(doc["score"]) if doc and "score" in doc and doc["score"] is not None else 0
+    out = {}
+    for k in TRAIT_KEYS:
+        out[k] = score if k == "Score" else ""    # default others empty
+    return out
+
+def get_onchain_traits(address: str):
+    q = {
         "query": f"""
         query {{
-          contractByName(name: "{CONTRACT_NAME}") {{
-            state(filter: {{
-              key: {{ like: "traits:{user_address}:%" }}
-            }}) {{
-              edges {{
-                node {{
-                  key
-                  value
-                }}
-              }}
-            }}
+          allStates(
+            filter: {{ key: {{ like: "{SBT_CONTRACT}.traits:{address}:%" }} }},
+            first: 500
+          ) {{
+            edges {{ node {{ key value }} }}
           }}
         }}
         """
     }
-    r = requests.post(GRAPHQL_URL, json=query)
+    r = requests.post(GRAPHQL_URL, json=q, timeout=20)
     r.raise_for_status()
-    data = r.json()
+    edges = r.json().get("data", {}).get("allStates", {}).get("edges", []) or []
+    chain = {k: "" for k in TRAIT_KEYS}
+    for e in edges:
+        key_str = e["node"]["key"]  # e.g. con_sbt_traits.traits:ADDR:Score
+        try:
+            after = key_str.split(".traits:", 1)[1]
+            addr, trait_key = after.split(":", 1)
+            if trait_key in chain:
+                chain[trait_key] = e["node"]["value"]
+        except Exception:
+            continue
+    return chain
 
-    traits_on_chain = {key: 0 for key in TRAIT_KEYS}
-    edges = data.get("data", {}).get("contractByName", {}).get("state", {}).get("edges", [])
-    for edge in edges:
-        key = edge["node"]["key"]
-        _, addr, trait_key = key.split(":")  # traits:address:TraitName
-        traits_on_chain[trait_key] = edge["node"]["value"]
+# ---------- API ----------
+@app.get("/api/compare_traits")
+def compare_traits():
+    address = request.args.get("address", "").strip()
+    if not address:
+        return jsonify({"error": "Address is required"}), 400
 
-    return traits_on_chain
-
-@app.route("/api/trait-diff")
-def trait_diff():
-    user = request.args.get("address")
-    if not user:
-        return jsonify({"error": "No address provided"}), 400
-
-    db_traits = get_traits_from_db(user)
-    chain_traits = get_traits_from_chain(user)
+    offchain = get_offchain_traits(address)
+    onchain = get_onchain_traits(address)
 
     diffs = {}
-    for k in TRAIT_KEYS:
-        if str(chain_traits.get(k)) != str(db_traits.get(k)):
-            diffs[k] = {"off_chain": db_traits.get(k), "on_chain": chain_traits.get(k)}
+    if str(offchain["Score"]) != str(onchain["Score"]):
+        diffs["Score"] = {"off_chain": offchain["Score"], "on_chain": onchain["Score"]}
 
-    return jsonify(diffs)
+    return jsonify({"address": address, "offchain": offchain, "onchain": onchain, "diffs": diffs})
+
+# ---------- frontend ----------
+# Flask will serve /public automatically as static root.
+# Ensure /public/index.html exists. Root route returns it:
+@app.get("/")
+def root():
+    return send_from_directory("public", "index.html")
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    # optional: show absolute path for sanity
+    print("Serving static from:", os.path.abspath("public"))
+    app.run(host="127.0.0.1", port=5000, debug=True)
