@@ -27,16 +27,31 @@ if (window.__SBT_APP_INIT__) {
   let updating = false;    // re-entrancy lock
   let lastClickAt = 0;     // debounce timestamp
 
-  const setStatus = (msg) => statusEl.textContent = msg;
+  const setStatus = (msg) => { statusEl.textContent = msg; };
+
+  function iconForTrait(k){
+    const map = {
+      "Score":"⚡", "Tier":"🏅", "Stake Duration":"⏳",
+      "DEX Volume":"📈", "Game Wins":"🎮", "Bots Created":"🤖", "Pulse Influence":"📣"
+    };
+    return map[k] || "★";
+  }
 
   function renderTable(data){
     const rows = [];
     rows.push(`<div class="tr h"><div>Trait</div><div>Off‑chain (DB)</div><div>On‑chain</div></div>`);
+    let i = 0;
     for (const k of KEYS){
       const dbv = data.offchain?.[k] ?? "";
       const onv = data.onchain?.[k] ?? "";
       const diff = (k === "Score") && String(dbv) !== String(onv);
-      rows.push(`<div class="tr ${diff ? "diff" : ""}"><div>${k}</div><div>${dbv}</div><div>${onv}</div></div>`);
+      rows.push(
+        `<div class="tr anim ${diff ? "diff" : ""}" style="--i:${i++}">
+           <div class="trait"><span class="ico">${iconForTrait(k)}</span>${k}</div>
+           <div>${dbv}</div>
+           <div>${onv}</div>
+         </div>`
+      );
     }
     tableEl.innerHTML = rows.join("");
   }
@@ -45,6 +60,15 @@ if (window.__SBT_APP_INIT__) {
   XianWalletUtils.init(RPC_URL);
   document.addEventListener('xianReady', () => setStatus("Wallet bridge ready. Click Connect."));
 
+  // navbar scroll state (stronger glass when scrolled)
+  const barEl = document.querySelector('.bar');
+  const onScroll = () => {
+    if (window.scrollY > 4) barEl.classList.add('scrolled');
+    else barEl.classList.remove('scrolled');
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
   async function connectWallet(){
     try{
       const info = await XianWalletUtils.requestWalletInfo();
@@ -52,6 +76,7 @@ if (window.__SBT_APP_INIT__) {
       addrTag.textContent = `address: ${info.truncatedAddress || info.address || '—'}`;
       netTag.textContent  = `network: testnet`;
       setStatus(`Connected: ${info.truncatedAddress || info.address}`);
+      btnConnect.style.display = "none";
     }catch(e){
       console.error(e);
       alert("Wallet not detected or not responding. Allow localhost/127.0.0.1 and use testnet.");
@@ -65,10 +90,13 @@ if (window.__SBT_APP_INIT__) {
     if (!addr){ alert("Enter an address or connect wallet first."); return; }
 
     setStatus("Comparing…");
+    statusEl.classList.remove("error");
+    statusEl.classList.add("live");
     btnUpdate.style.display = "none";
     btnRefresh.style.display = "none";
     btnUpdate.disabled = true;
-    tableEl.innerHTML = "";
+    tableEl.classList.add("loading");
+    tableEl.innerHTML = `<div class="spinner"></div>`;
 
     try{
       const res = await fetch(`${API_BASE}/api/compare_traits?address=${encodeURIComponent(addr)}`);
@@ -76,6 +104,7 @@ if (window.__SBT_APP_INIT__) {
       last = data;
 
       renderTable(data);
+      tableEl.classList.remove("loading");
 
       const hasScoreDiff  = !!(data.diffs && data.diffs.Score);
       const walletMatches = !!(walletInfo && walletInfo.address === data.address);
@@ -88,15 +117,20 @@ if (window.__SBT_APP_INIT__) {
         btnRefresh.style.display = "inline-block";
         btnUpdate.style.display  = "inline-block";
         btnUpdate.disabled = !walletMatches;     // STRICT: only if same address
+        btnUpdate.classList.toggle("pulse", walletMatches);
       } else {
         setStatus("No differences in Score.");
         btnRefresh.style.display = "inline-block";
         btnUpdate.style.display  = "none";
         btnUpdate.disabled = true;
+        btnUpdate.classList.remove("pulse");
       }
     }catch(e){
       console.error(e);
       setStatus("Failed to compare traits (API error).");
+      statusEl.classList.remove("live");
+      statusEl.classList.add("error");
+      tableEl.classList.remove("loading");
     }
   }
 

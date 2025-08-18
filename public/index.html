@@ -3,45 +3,48 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Xian SBT Trait Sync (WalletUtils)</title>
-  <style>
-    :root{--line:#e5e7eb;--fg:#111827}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;margin:0;padding:20px;color:var(--fg)}
-    .bar{display:flex;gap:8px;align-items:center;margin-bottom:16px}
-    .tag{padding:4px 8px;border:1px solid var(--line);border-radius:8px;font-size:12px}
-    .btn{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
-    .row{display:flex;gap:8px;align-items:center;margin:10px 0}
-    .table{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:8px}
-    .tr{display:grid;grid-template-columns:220px 1fr 1fr;gap:8px;padding:8px;border-bottom:1px solid var(--line)}
-    .tr.h{font-weight:600;background:#f9fafb}
-    .tr.diff{color:#b91c1c;font-weight:600}
-    code{background:#f3f4f6;padding:0 6px;border-radius:6px}
-  </style>
+  <title>Xian SBT Trait Sync</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <meta name="color-scheme" content="dark light"/>
 </head>
 <body>
   <div class="bar">
-    <span class="tag" id="netTag">network: testnet</span>
-    <span class="tag" id="addrTag">address: —</span>
-    <button class="btn" id="btnConnect">Connect Wallet</button>
+    <div class="brand">Xian SBT Trait Sync</div>
+    <div class="right">
+      <span class="tag" id="netTag">network: testnet</span>
+      <span class="tag" id="addrTag">address: —</span>
+      <button class="btn" id="btnConnect">Connect Wallet</button>
+    </div>
   </div>
 
-  <h2>1) Compare Off‑chain (DB) vs On‑chain</h2>
-  <div class="row">
-    <input id="addr" placeholder="Enter wallet address (or leave blank for connected)" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:8px;">
-    <button class="btn" id="btnCompare">Compare Traits</button>
+  <div class="container">
+    <div class="hero">
+      <div class="orbs" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <h1>Sync your SBT traits with style.</h1>
+      <p>Compare your off‑chain activity with on‑chain traits and push updates securely using your wallet. Built for Xian testnet.</p>
+      <div class="spark">Live preview</div>
+    </div>
+
+    <div class="card enhanced">
+      <h2 style="margin:0 0 8px 0;font-weight:800;letter-spacing:.2px">Compare Off‑chain vs On‑chain</h2>
+      <div class="row mt">
+        <input id="addr" class="input" placeholder="Enter wallet address (or leave blank for connected)" />
+        <button class="btn primary" id="btnCompare">Compare Traits</button>
+      </div>
+      <div id="status" class="muted">No wallet detected yet.</div>
+
+      <div id="table" class="table mt"></div>
+
+      <div class="row mt">
+        <button class="btn" id="btnUpdate" style="display:none;">Update Traits On‑chain</button>
+        <button class="btn" id="btnRefresh" style="display:none;">Re‑check</button>
+      </div>
+    </div>
   </div>
-  <div id="status" style="margin:6px 0; color:#374151;">No wallet detected yet.</div>
 
-  <div id="table" class="table"></div>
-
-  <div class="row">
-    <button class="btn" id="btnUpdate" style="display:none;">Update Traits On‑chain</button>
-    <button class="btn" id="btnRefresh" style="display:none;">Re‑check</button>
-  </div>
-
-  <!-- Wallet utils (your provided code) -->
   <script src="./xian-wallet-utils.js"></script>
-  <!-- App logic -->
   <script src="./app.js"></script>
 </body>
 </html>
