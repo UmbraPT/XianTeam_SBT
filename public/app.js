@@ -9,7 +9,7 @@ if (window.__SBT_APP_INIT__) {
   const API_BASE     = "http://127.0.0.1:5000";   // Flask API
   const RPC_URL      = "https://testnet.xian.org";
   const STAMP_LIMIT  = 25;                        // cap stamps for update_trait
-  const KEYS = ["Score","Tier","Stake Duration","DEX Volume","Game Wins","Bots Created","Pulse Influence"];
+  const KEYS = ["Score","Tier","Stake Duration","DEX Volume"];
 
   // ===== DOM =====
   const btnConnect = document.getElementById("btnConnect");
@@ -32,7 +32,7 @@ if (window.__SBT_APP_INIT__) {
   function iconForTrait(k){
     const map = {
       "Score":"⚡", "Tier":"🏅", "Stake Duration":"⏳",
-      "DEX Volume":"📈", "Game Wins":"🎮", "Bots Created":"🤖", "Pulse Influence":"📣"
+      "DEX Volume":"📈"
     };
     return map[k] || "★";
   }
@@ -59,6 +59,27 @@ if (window.__SBT_APP_INIT__) {
   // Wallet bridge
   XianWalletUtils.init(RPC_URL);
   document.addEventListener("xianReady", () => setStatus("Wallet bridge ready. Click Connect."));
+
+  // -------- tiers & badges (jungle) --------
+  function tierFromScore(score){
+    const s = Number(score || 0);
+    if (s < 500)    return { key:"leafling",          name:"Leafling",            range:"< 500",        file:"leafling.png" };
+    if (s < 1500)   return { key:"vine-crawler",      name:"Vine Crawler",        range:"500–1,500",    file:"vine-crawler.png" };
+    if (s < 3000)   return { key:"canopy-dweller",    name:"Canopy Dweller",      range:"1,500–3,000",  file:"canopy-dweller.png" };
+    if (s < 5000)   return { key:"rainkeeper",        name:"Rainkeeper",          range:"3,000–5,000",  file:"rainkeeper.png" };
+    if (s < 10000)  return { key:"jaguar-fang",       name:"Jaguar Fang",         range:"5,000–10,000", file:"jaguar-fang.png" };
+    return             { key:"spirit-of-the-jungle",  name:"Spirit of the Jungle",range:"10,000+",      file:"spirit-of-the-jungle.png" };
+  }
+
+  function applyBadge(score){
+    const tier = tierFromScore(score);
+    const img  = document.getElementById("userBadge");
+    const name = document.getElementById("tierName");
+    const rng  = document.getElementById("tierRange");
+    if (img)  img.src  = `/assets/badges/${tier.file}`;
+    if (name) name.textContent = tier.name;
+    if (rng)  rng.textContent  = `Tier • ${tier.range}`;
+  }
 
   // navbar scroll state (stronger glass when scrolled)
   const barEl = document.querySelector('.bar');
@@ -187,7 +208,7 @@ if (window.__SBT_APP_INIT__) {
   // Initial table skeleton
   tableEl.innerHTML = [
     `<div class="tr h"><div>Trait</div><div>Off‑chain (DB)</div><div>On‑chain</div></div>`,
-    ...["Score","Tier","Stake Duration","DEX Volume","Game Wins","Bots Created","Pulse Influence"]
+    ...["Score","Tier","Stake Duration","DEX Volume"]
       .map(k => `<div class="tr"><div>${k}</div><div>—</div><div>—</div></div>`)
   ].join("");
 }
