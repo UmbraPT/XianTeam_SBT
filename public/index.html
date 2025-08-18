@@ -3,78 +3,47 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>XimpTeam · SBT Trait Sync</title>
-  <link rel="stylesheet" href="./jungle.css">
+  <title>Xian SBT Trait Sync</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <meta name="color-scheme" content="dark light"/>
 </head>
 <body>
-  <!-- Top Nav -->
-  <header class="nav">
-    <div class="brand">
-      <div class="badge">XT</div>
-      <div class="stack">
-        <div class="title">XimpTeam</div>
-        <div class="sub">Builders on Xian Network</div>
+  <div class="bar">
+    <div class="brand">Xian SBT Trait Sync</div>
+    <div class="right">
+      <span class="tag" id="netTag">network: testnet</span>
+      <span class="tag" id="addrTag">address: —</span>
+      <button class="btn" id="btnConnect">Connect Wallet</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <div class="orbs" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <h1>Sync your SBT traits with style.</h1>
+      <p>Compare your off‑chain activity with on‑chain traits and push updates securely using your wallet. Built for Xian testnet.</p>
+      <div class="spark">Live preview</div>
+    </div>
+
+    <div class="card enhanced">
+      <h2 style="margin:0 0 8px 0;font-weight:800;letter-spacing:.2px">Compare Off‑chain vs On‑chain</h2>
+      <div class="row mt">
+        <input id="addr" class="input" placeholder="Enter wallet address (or leave blank for connected)" />
+        <button class="btn primary" id="btnCompare">Compare Traits</button>
+      </div>
+      <div id="status" class="muted">No wallet detected yet.</div>
+
+      <div id="table" class="table mt"></div>
+
+      <div class="row mt">
+        <button class="btn" id="btnUpdate" style="display:none;">Update Traits On‑chain</button>
+        <button class="btn" id="btnRefresh" style="display:none;">Re‑check</button>
       </div>
     </div>
-    <div class="tags">
-      <span id="netTag" class="chip">network: testnet</span>
-      <span id="addrTag" class="chip">address: —</span>
-      <button id="btnConnect" class="btn btn-ghost" type="button">Connect Wallet</button>
-    </div>
-  </header>
+  </div>
 
-  <!-- Hero -->
-  <section class="hero">
-    <div class="copy">
-      <h1>Jungle‑native <span class="accent">SBT</span> sync</h1>
-      <p>Compare your off‑chain score with on‑chain traits, then update in a single click.</p>
-      <div class="actions">
-        <button id="scrollToApp" class="btn btn-primary" type="button">Open Sync Panel</button>
-        <a class="btn btn-ghost" href="https://xian.org" target="_blank" rel="noopener">Learn Xian</a>
-      </div>
-      <div class="micro">
-        <span>Zero‑friction UX</span>
-        <span>Gas‑aware design</span>
-        <span>Real‑time scoring</span>
-      </div>
-    </div>
-    <div class="art">
-      <div class="orb"></div>
-      <div class="ring"></div>
-      <div class="glow"></div>
-    </div>
-  </section>
-
-  <!-- App Card -->
-  <main id="appCard" class="card">
-    <div class="card-head">
-      <h2>SBT Trait Sync Panel</h2>
-      <p id="status" class="muted">No wallet detected yet. Click Connect.</p>
-    </div>
-
-    <div class="row">
-      <input id="addr" class="input" placeholder="Enter wallet address (or leave blank to use connected)">
-      <button id="btnCompare" class="btn" type="button">Compare Traits</button>
-    </div>
-
-    <div id="table" class="table">
-      <!-- filled by JS -->
-    </div>
-
-    <div class="row end">
-      <button id="btnUpdate"  class="btn btn-primary" type="button" style="display:none;">Update Traits On‑chain</button>
-      <button id="btnRefresh" class="btn"            type="button" style="display:none;">Re‑check</button>
-    </div>
-  </main>
-
-  <!-- Footer -->
-  <footer class="foot">
-    <span>© XimpTeam • Built for Xian</span>
-    <span class="dot"></span>
-    <span>Design: Jungle theme</span>
-  </footer>
-
-  <!-- Wallet bridge + App -->
   <script src="./xian-wallet-utils.js"></script>
   <script src="./app.js"></script>
 </body>
