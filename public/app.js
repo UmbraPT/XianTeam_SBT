@@ -1,14 +1,14 @@
-// ===== guard against double script load / multi-wiring =====
+// Guard against double load
 if (window.__SBT_APP_INIT__) {
   console.warn("app.js already initialized — skipping duplicate wiring.");
 } else {
   window.__SBT_APP_INIT__ = true;
 
-  // ===== config =====
-  const CONTRACT    = "con_sbtxian";               // your merged SBT+traits
-  const API_BASE    = "http://127.0.0.1:5000";     // Flask server
-  const RPC_URL     = "https://testnet.xian.org";  // testnet RPC for wallet utils
-  const STAMP_LIMIT = 25;                          // <<< set your desired cap (try 25–40)
+  // ------- config -------
+  const CONTRACT     = "con_sbtxian";             // << your merged SBT+traits contract
+  const API_BASE     = "http://127.0.0.1:5000";   // Flask API
+  const RPC_URL      = "https://testnet.xian.org";
+  const STAMP_LIMIT  = 25;                        // cap stamps for update_trait
   const KEYS = ["Score","Tier","Stake Duration","DEX Volume","Game Wins","Bots Created","Pulse Influence"];
 
   // ===== DOM =====
@@ -56,9 +56,9 @@ if (window.__SBT_APP_INIT__) {
     tableEl.innerHTML = rows.join("");
   }
 
-  // ===== wallet utils init =====
+  // Wallet bridge
   XianWalletUtils.init(RPC_URL);
-  document.addEventListener('xianReady', () => setStatus("Wallet bridge ready. Click Connect."));
+  document.addEventListener("xianReady", () => setStatus("Wallet bridge ready. Click Connect."));
 
   // navbar scroll state (stronger glass when scrolled)
   const barEl = document.querySelector('.bar');
@@ -73,7 +73,7 @@ if (window.__SBT_APP_INIT__) {
     try{
       const info = await XianWalletUtils.requestWalletInfo();
       walletInfo = info;
-      addrTag.textContent = `address: ${info.truncatedAddress || info.address || '—'}`;
+      addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
       netTag.textContent  = `network: testnet`;
       setStatus(`Connected: ${info.truncatedAddress || info.address}`);
       btnConnect.style.display = "none";
@@ -137,21 +137,18 @@ if (window.__SBT_APP_INIT__) {
   async function updateOnChain(e){
     e?.preventDefault?.();
 
-    // strong debounce: ignore clicks within 800ms
+    // strong debounce
     const now = Date.now();
     if (now - lastClickAt < 800) return;
     lastClickAt = now;
 
-    if (updating) return; // lock
+    if (updating) return;
     if (!last || !last.address){ alert("Compare first."); return; }
     if (!walletInfo){ await connectWallet(); if (!walletInfo) return; }
 
-    // STRICT: connected wallet must match the compared address
+    // STRICT: only the holder can update
     if (walletInfo.address !== last.address){
-      alert(
-        `Connected wallet ${walletInfo.address} does not match the address being updated (${last.address}).\n` +
-        `Please connect the correct wallet and try again.`
-      );
+      alert(`Connected wallet ${walletInfo.address} does not match ${last.address}. Connect the correct wallet.`);
       return;
     }
 
@@ -163,13 +160,12 @@ if (window.__SBT_APP_INIT__) {
       btnUpdate.style.pointerEvents = "none";
       setStatus("Sending update_trait…");
 
-      // SINGLE TX ONLY: update_trait("Score", <db score>)
       const tx = await XianWalletUtils.sendTransaction(
         CONTRACT, "update_trait", { key: "Score", value: newScore }, STAMP_LIMIT
       );
       console.log("update_trait tx status:", tx);
 
-      alert("Update submitted. We’ll re-check in a moment.");
+      alert("Update submitted. Re‑checking in 2s…");
       setTimeout(doCompare, 2000);
     }catch(e){
       console.error(e);
@@ -177,21 +173,21 @@ if (window.__SBT_APP_INIT__) {
     }finally{
       updating = false;
       btnUpdate.style.pointerEvents = "";
-      // keep disabled until next compare
     }
   }
 
-  // ===== ensure single binding =====
-  btnConnect.onclick = null;
-  btnCompare.onclick = null;
-  btnUpdate .onclick = null;
-  btnRefresh.onclick = null;
-
+  // Wire up
   btnConnect.addEventListener("click", connectWallet);
   btnCompare.addEventListener("click", doCompare);
-  btnUpdate .addEventListener("click", updateOnChain);
   btnRefresh.addEventListener("click", doCompare);
+  document.getElementById("scrollToApp")?.addEventListener("click", () => {
+    document.getElementById("appCard")?.scrollIntoView({ behavior: "smooth" });
+  });
 
-  // initial status
-  setStatus("No wallet detected yet. Click Connect.");
+  // Initial table skeleton
+  tableEl.innerHTML = [
+    `<div class="tr h"><div>Trait</div><div>Off‑chain (DB)</div><div>On‑chain</div></div>`,
+    ...["Score","Tier","Stake Duration","DEX Volume","Game Wins","Bots Created","Pulse Influence"]
+      .map(k => `<div class="tr"><div>${k}</div><div>—</div><div>—</div></div>`)
+  ].join("");
 }
