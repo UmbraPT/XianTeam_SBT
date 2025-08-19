@@ -69,14 +69,64 @@ def mark_processed(tx_hash: str):
 def ensure_user(address: str):
     traits_col.update_one(
         {"address": address},
-        {"$setOnInsert": {"address": address, "score": 0, "amount": 0.0}},
+        {"$setOnInsert": {
+            "address": address,
+            "score": 0,
+            "amount": 0.0,
+            "dex_volume": 0.0,
+            "dex_swaps": 0,
+            "stake_duration_sec": 0,
+            "stake_active": False,
+            "stake_last_update": None,
+            "total_sent_xian": 0.0,
+            "updated_at": time.time(),
+        }},
         upsert=True
     )
 
-def add_points(address: str, score: int, amount: float):
+def add_points(address: str, score: int, amount_to_add: float = 0.0):
     traits_col.update_one(
         {"address": address},
-        {"$inc": {"score": int(score), "amount": float(amount)}}
+        {"$inc": {"score": int(score), "amount": float(amount_to_add)}, "$set": {"updated_at": time.time()}}
+    )
+
+def inc_total_sent_xian(address: str, amount: float):
+    traits_col.update_one(
+        {"address": address},
+        {"$inc": {"total_sent_xian": float(amount)}, "$set": {"updated_at": time.time()}}
+    )
+
+def inc_dex_volume(address: str, vol: float):
+    traits_col.update_one(
+        {"address": address},
+        {"$inc": {"dex_volume": float(vol), "dex_swaps": 1}, "$set": {"updated_at": time.time()}}
+    )
+
+def stake_start_or_refresh(address: str, now_ts: float):
+    doc = traits_col.find_one({"address": address}, {"stake_active": 1, "stake_last_update": 1, "stake_duration_sec": 1})
+    if not doc or not doc.get("stake_active"):
+        traits_col.update_one(
+            {"address": address},
+            {"$set": {"stake_active": True, "stake_last_update": now_ts, "updated_at": now_ts}}
+        )
+    else:
+        # already active: accrue elapsed then refresh
+        last = doc.get("stake_last_update") or now_ts
+        elapsed = max(0, int(now_ts - last))
+        traits_col.update_one(
+            {"address": address},
+            {"$inc": {"stake_duration_sec": elapsed},
+             "$set": {"stake_last_update": now_ts, "updated_at": now_ts}}
+        )
+
+def stake_stop(address: str, now_ts: float):
+    doc = traits_col.find_one({"address": address}, {"stake_active": 1, "stake_last_update": 1})
+    last = (doc or {}).get("stake_last_update")
+    elapsed = max(0, int(now_ts - last)) if last else 0
+    traits_col.update_one(
+        {"address": address},
+        {"$inc": {"stake_duration_sec": elapsed},
+         "$set": {"stake_active": False, "stake_last_update": now_ts, "updated_at": now_ts}}
     )
 
 def get_all_sbt_holders() -> set:
@@ -209,35 +259,87 @@ async def ws_loop():
                     func     = payload_obj.get("function")
                     kwargs   = payload_obj.get("kwargs", {}) or {}
 
-                    mr = match_rule(contract, func)
-                    if not mr:
-                        # Not one we score
+                    now_ts = time.time()
+
+                    # currency.transfer — points +1, and track total_sent_xian
+                    if contract == "currency" and func == "transfer":
+                        amount = 0.0
+                        if "amount" in kwargs:
+                            try: amount = float(kwargs["amount"])
+                            except: amount = 0.0
+
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            add_points(sender, score=1, amount_to_add=amount)    # your original behavior
+                            inc_total_sent_xian(sender, amount)           # NEW aggregate
+                            print(f"⚡ transfer {sender} +1pt | total_sent_xian+={amount}")
                         if tx_hash:
                             mark_processed(tx_hash)
                         continue
 
-                    points, amt_field = mr
-                    amount = 0.0
-                    if amt_field and amt_field in kwargs:
-                        try:
-                            amount = float(kwargs[amt_field])
-                        except Exception:
-                            amount = 0.0
+                    # con_dex_v2.swapExactTokenForToken — points +5, track dex_volume (+ count)
+                    if contract == "con_dex_v2" and func == "swapExactTokenForToken":
+                        vol = 1.0
+                        for k in ("amountIn", "amount_in", "amount"):
+                            if k in kwargs:
+                                try:
+                                    vol = float(kwargs[k]); break
+                                except:
+                                    pass
 
-                    # Only score if sender holds SBT
-                    if sender in sbt_holders:
-                        ensure_user(sender)
-                        add_points(sender, points, amount)
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            add_points(sender, score=5, amount_to_add=0.0)
+                            inc_dex_volume(sender, vol)
+                            print(f"💱 swap {sender} +5pts | dex_volume+={vol}")
                         if tx_hash:
                             mark_processed(tx_hash)
-                        tag = f" (tx {tx_hash})" if tx_hash else ""
-                        extra = f" | amount={amount}" if amt_field else ""
-                        print(f"🌟 {sender} +{points} pts{extra}{tag}")
-                    else:
-                        # Not an SBT holder; ignore noisily for visibility
+                        continue
+
+                    # con_staking_v1.deposit — points +15, mark stake active/refresh
+                    if contract == "con_staking_v1" and func == "deposit":
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            add_points(sender, score=15, amount=0.0)
+                            stake_start_or_refresh(sender, now_ts)
+                            print(f"📥 stake start/refresh {sender}")
                         if tx_hash:
                             mark_processed(tx_hash)
-                        print(f"⛔ Ignored {sender}: no SBT")
+                        continue
+
+                    # con_staking_v1 withdrawals — accrue duration and stop
+                    if contract == "con_staking_v1" and func in ("withdraw", "unstake", "emergency_withdraw"):
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            stake_stop(sender, now_ts)
+                            print(f"🏁 stake stop {sender}")
+                        if tx_hash:
+                            mark_processed(tx_hash)
+                        continue
+
+                    # other functions you might still want to score (e.g., votes, submissions)
+                    if contract == "con_xipoll_v0_clean" and func == "vote":
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            add_points(sender, score=5, amount=0.0)
+                            print(f"🗳️ vote {sender} +5pts")
+                        if tx_hash:
+                            mark_processed(tx_hash)
+                        continue
+
+                    if contract == "submission" and func == "submit_contract":
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            add_points(sender, score=50, amount=0.0)
+                            print(f"📜 submit_contract {sender} +50pts")
+                        if tx_hash:
+                            mark_processed(tx_hash)
+                        continue
+
+                    # Not tracked — just mark processed so we don't revisit
+                    if tx_hash:
+                        mark_processed(tx_hash)
+
 
         except Exception as e:
             # Connection dropped or failed -> short backoff, then retry
