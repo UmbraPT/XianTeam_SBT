@@ -296,6 +296,25 @@ async def ws_loop():
                             mark_processed(tx_hash)
                         continue
 
+                                        # con_dex_v2.swapExactTokenForToken — points +5, track dex_volume (+ count)
+                    if contract == "con_dex_router_n" and func == "swapExactTokenForTokenSupportingFeeOnTransferTokens":
+                        vol = 1.0
+                        for k in ("amountIn", "amount_in", "amount"):
+                            if k in kwargs:
+                                try:
+                                    vol = float(kwargs[k]); break
+                                except:
+                                    pass
+
+                        if sender in sbt_holders:
+                            ensure_user(sender)
+                            add_points(sender, score=5, amount_to_add=0.0)
+                            inc_dex_volume(sender, vol)
+                            print(f"💱 swap {sender} +5pts | dex_volume+={vol}")
+                        if tx_hash:
+                            mark_processed(tx_hash)
+                        continue
+
                     # con_staking_v1.deposit — points +15, mark stake active/refresh
                     if contract == "con_staking_v1" and func == "deposit":
                         if sender in sbt_holders:
