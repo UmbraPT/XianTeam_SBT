@@ -9,7 +9,7 @@ if (window.__SBT_APP_INIT__) {
   const API_BASE     = "http://127.0.0.1:5000";   // Flask API
   const RPC_URL      = "https://testnet.xian.org";
   const STAMP_LIMIT  = 25;                        // cap stamps for update_trait
-  const KEYS = ["Score","Tier","Stake Duration","DEX Volume"];
+  const KEYS = ["Score","Tier","Stake Duration","DEX Volume", "Total Sent XIAN"];
 
   // ===== DOM =====
   const btnConnect = document.getElementById("btnConnect");
@@ -37,13 +37,36 @@ if (window.__SBT_APP_INIT__) {
     return map[k] || "★";
   }
 
+  function humanSeconds(s){
+    const n = Number(s||0);
+    const d = Math.floor(n/86400), h = Math.floor((n%86400)/3600), m = Math.floor((n%3600)/60);
+    if (d) return `${d}d ${h}h`;
+    if (h) return `${h}h ${m}m`;
+    if (m) return `${m}m`;
+    return `${n|0}s`;
+  }
+  function fmtNum(x, digits=2){
+    const n = Number(x||0);
+    return n.toLocaleString(undefined, { maximumFractionDigits: digits });
+  }
+
+  function pretty(k, v){
+    if (v === "" || v === undefined || v === null) return "—";
+    if (k === "Stake Duration")           return humanSeconds(v);
+    if (k === "DEX Volume")               return fmtNum(v, 4);
+    if (k === "Total Sent XIAN")          return fmtNum(v, 4);
+    return v; // Score or anything else
+  }
+
   function renderTable(data){
     const rows = [];
     rows.push(`<div class="tr h"><div>Trait</div><div>Off‑chain (DB)</div><div>On‑chain</div></div>`);
     let i = 0;
     for (const k of KEYS){
-      const dbv = data.offchain?.[k] ?? "";
-      const onv = data.onchain?.[k] ?? "";
+      const rawDb = data.offchain?.[k];
+      const rawOn = data.onchain?.[k];
+      const dbv   = pretty(k, rawDb);
+      const onv   = pretty(k, rawOn);
       const diff = (k === "Score") && String(dbv) !== String(onv);
       rows.push(
         `<div class="tr anim ${diff ? "diff" : ""}" style="--i:${i++}">
@@ -207,8 +230,8 @@ if (window.__SBT_APP_INIT__) {
 
   // Initial table skeleton
   tableEl.innerHTML = [
-    `<div class="tr h"><div>Trait</div><div>Off‑chain (DB)</div><div>On‑chain</div></div>`,
-    ...["Score","Tier","Stake Duration","DEX Volume"]
+    `<div class="tr h"><div>Trait</div><div>Off-chain (DB)</div><div>On-chain</div></div>`,
+    ...["Score","Stake Duration","DEX Volume","Total Sent XIAN"]
       .map(k => `<div class="tr"><div>${k}</div><div>—</div><div>—</div></div>`)
   ].join("");
 }
