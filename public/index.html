@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Xian SBT Trait Sync</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <meta name="color-scheme" content="dark light"/>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">Xian SBT Trait Sync</div>
+    <div class="right">
+      <span class="tag" id="netTag">network: testnet</span>
+      <span class="tag" id="addrTag">address: —</span>
+      <button class="btn" id="btnConnect">Connect Wallet</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <div class="orbs" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <h1>Sync your SBT traits with style.</h1>
+      <p>Compare your off‑chain activity with on‑chain traits and push updates securely using your wallet. Built for Xian testnet.</p>
+      <div class="spark">Live preview</div>
+    </div>
+
+    <div class="card enhanced">
+      <h2 style="margin:0 0 8px 0;font-weight:800;letter-spacing:.2px">Compare Off‑chain vs On‑chain</h2>
+      <div class="row mt">
+        <input id="addr" class="input" placeholder="Enter wallet address (or leave blank for connected)" />
+        <button class="btn primary" id="btnCompare">Compare Traits</button>
+      </div>
+      <div id="status" class="muted">No wallet detected yet.</div>
+      
+      <div class="badge-row">
+        <img id="userBadge" class="badge-img" src="/assets/badges/leafling.png" alt="Tier badge">
+          <div class="badge-meta">
+            <div class="badge-title" id="tierName">Leafling</div>
+            <div class="badge-sub" id="tierRange">Tier • &lt; 500</div>
+          </div>
+      </div>
+      
+      <div id="table" class="table mt"></div>
+
+      <div class="row mt">
+        <button class="btn" id="btnUpdate" style="display:none;">Update Traits On‑chain</button>
+        <button class="btn" id="btnRefresh" style="display:none;">Re‑check</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./xian-wallet-utils.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
