@@ -10,7 +10,7 @@ TRAITS_COLLECTION = "traits"
 
 GRAPHQL_URL = "https://devnet.xian.org/graphql"
 SBT_CONTRACT = "con_sbtxian"   # your merged contract name
-TRAIT_KEYS = ["Score", "Tier", "Stake Duration", "DEX Volume", "Game Wins", "Bots Created", "Pulse Influence"]
+TRAIT_KEYS = ["Score", "Stake Duration", "DEX Volume", "Total Sent XIAN"]
 
 # ---- app ----
 app = Flask(
@@ -24,13 +24,34 @@ client = MongoClient(MONGO_URI)
 db = client[MONGO_DB]
 traits_col = db[TRAITS_COLLECTION]
 
+def as_float(x, default=0.0):
+    try:
+        if isinstance(x, (int, float)): return float(x)
+        if isinstance(x, str) and x.strip() != "": return float(x)
+    except Exception:
+        pass
+    return float(default)
+
+def as_int(x, default=0):
+    try:
+        if isinstance(x, (int, float)): return int(x)
+        if isinstance(x, str) and x.strip() != "": return int(float(x))
+    except Exception:
+        pass
+    return int(default)
+
 def get_offchain_traits(address: str):
-    doc = traits_col.find_one({"address": address}, {"_id": 0, "score": 1})
-    score = int(doc["score"]) if doc and "score" in doc and doc["score"] is not None else 0
-    out = {}
-    for k in TRAIT_KEYS:
-        out[k] = score if k == "Score" else ""    # default others empty
-    return out
+    doc = traits_col.find_one(
+        {"address": address},
+        {"_id": 0, "score": 1, "dex_volume": 1, "stake_duration_sec": 1, "total_sent_xian": 1}
+    ) or {}
+
+    return {
+        "Score":           as_int(doc.get("score", 0)),
+        "Stake Duration":  as_int(doc.get("stake_duration_sec", 0)),
+        "DEX Volume":      as_float(doc.get("dex_volume", 0.0)),
+        "Total Sent XIAN": as_float(doc.get("total_sent_xian", 0.0)),
+    }
 
 def get_onchain_traits(address: str):
     q = {

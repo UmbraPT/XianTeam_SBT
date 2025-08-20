@@ -14,13 +14,14 @@ if (window.__SBT_APP_INIT__) {
   // ===== DOM =====
   const btnConnect = document.getElementById("btnConnect");
   const btnCompare = document.getElementById("btnCompare");
-  const btnUpdate  = document.getElementById("btnUpdate");
+  let  btnUpdate  = document.getElementById("btnUpdate");
   const btnRefresh = document.getElementById("btnRefresh");
   const addrInput  = document.getElementById("addr");
   const addrTag    = document.getElementById("addrTag");
   const netTag     = document.getElementById("netTag");
   const statusEl   = document.getElementById("status");
   const tableEl    = document.getElementById("table");
+  const short = (a) => (a ? `${a.slice(0,6)}…${a.slice(-4)}` : "—");
 
   let walletInfo = null;   // { address, truncatedAddress, ... }
   let last = null;         // last /api/compare_traits payload
@@ -159,15 +160,19 @@ if (window.__SBT_APP_INIT__) {
           (walletMatches ? "" : " — Connect the same address to update.")
         );
         btnRefresh.style.display = "inline-block";
-        btnUpdate.style.display  = "inline-block";
-        btnUpdate.disabled = !walletMatches;     // STRICT: only if same address
+
+        // --- SINGLE-SHOT REBIND to prevent double prompts ---
+        const fresh = btnUpdate.cloneNode(true);
+        btnUpdate.replaceWith(fresh);
+        btnUpdate = fresh;
+
+        btnUpdate.style.display = "inline-block";
+        btnUpdate.disabled = !walletMatches;
         btnUpdate.classList.toggle("pulse", walletMatches);
-      } else {
-        setStatus("No differences in Score.");
-        btnRefresh.style.display = "inline-block";
-        btnUpdate.style.display  = "none";
-        btnUpdate.disabled = true;
-        btnUpdate.classList.remove("pulse");
+
+        if (walletMatches) {
+          btnUpdate.addEventListener("click", updateOnChain, { once: true });
+        }
       }
     }catch(e){
       console.error(e);
@@ -179,6 +184,7 @@ if (window.__SBT_APP_INIT__) {
   }
 
   async function updateOnChain(e){
+    console.log("updateOnChain clicked");
     e?.preventDefault?.();
 
     // strong debounce
