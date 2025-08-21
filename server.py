@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from pymongo import MongoClient
 import requests
 import os
+from flask_cors import CORS
 
 # ---- config ----
 MONGO_URI = "mongodb://localhost:27017/"
@@ -45,10 +46,16 @@ def derive_tier_label(score: int):
 
 
 # ---- app ----
-app = Flask(
-    __name__,
-    static_folder="public",     # serve /public as static root
-    static_url_path=""          # so /index.html is at /
+app = Flask(__name__, static_folder="public", static_url_path="")
+# Allow common dev origins; use "*" if you prefer (no cookies are used)
+CORS(
+    app,
+    resources={r"/api/*": {"origins": [
+        "http://127.0.0.1:5000",
+        "http://localhost:5000",
+        # Allow any ngrok preview:
+        "https://*.ngrok-free.app",
+    ]}},
 )
 
 # ---- db ----
@@ -168,4 +175,4 @@ def root():
 if __name__ == "__main__":
     # optional: show absolute path for sanity
     print("Serving static from:", os.path.abspath("public"))
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

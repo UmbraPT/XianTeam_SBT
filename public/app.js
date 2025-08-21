@@ -6,7 +6,8 @@ if (window.__SBT_APP_INIT__) {
 
   // ------- config -------
   const CONTRACT     = "con_sbtxian_v";             // << your merged SBT+traits contract
-  const API_BASE     = "http://127.0.0.1:5000";   // Flask API
+ // const API_BASE     = "http://127.0.0.1:5000";   // Flask API
+  const API_BASE = window.location.origin
   const RPC_URL      = "https://testnet.xian.org";
   const STAMP_LIMIT  = 500;                        // cap stamps for update_trait
   const KEYS = [
