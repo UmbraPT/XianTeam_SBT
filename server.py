@@ -9,8 +9,40 @@ MONGO_DB = "xian_monitor"
 TRAITS_COLLECTION = "traits"
 
 GRAPHQL_URL = "https://devnet.xian.org/graphql"
-SBT_CONTRACT = "con_sbtxian"   # your merged contract name
-TRAIT_KEYS = ["Score", "Stake Duration", "DEX Volume", "Total Sent XIAN"]
+SBT_CONTRACT = "con_sbtxian_v"   # your merged contract name
+TRAIT_KEYS = [
+    "Score",
+    "Tier",
+    "Stake Duration",
+    "DEX Volume",
+    "Pulse Influence",
+    "Transaction Volume",
+    "Bridge Volume",
+    "Volume Played",
+]
+
+# UI → on-chain key mapping
+CHAIN_TO_UI = {
+    "Score": "Score",
+    "Tier": "Tier",
+    "Stake Duration": "Stake Duration",
+    "DEX Volume": "DEX Volume",
+    "Pulse Influence": "Pulse Influence",
+    "Trx Volume": "Transaction Volume",
+    "Xian Bridged": "Bridge Volume",
+    "Volume Played": "Volume Played",
+}
+UI_TO_CHAIN = {v: k for k, v in CHAIN_TO_UI.items()}
+
+def derive_tier_label(score: int):
+    s = int(score or 0)
+    if s < 500:     return "Leafling"
+    if s < 1500:    return "Vine Crawler"
+    if s < 3000:    return "Canopy Dweller"
+    if s < 5000:    return "Rainkeeper"
+    if s < 10000:   return "Jaguar Fang"
+    return "Spirit of the Jungle"
+
 
 # ---- app ----
 app = Flask(
@@ -23,6 +55,19 @@ app = Flask(
 client = MongoClient(MONGO_URI)
 db = client[MONGO_DB]
 traits_col = db[TRAITS_COLLECTION]
+
+def _to_num(x):
+    try:
+        f = float(x)
+        return int(f) if f.is_integer() else f
+    except Exception:
+        return 0
+
+def _first_num(doc, keys, default=0):
+    for k in keys:
+        if k in doc and doc.get(k) is not None:
+            return _to_num(doc.get(k))
+    return default
 
 def as_float(x, default=0.0):
     try:
@@ -41,16 +86,26 @@ def as_int(x, default=0):
     return int(default)
 
 def get_offchain_traits(address: str):
-    doc = traits_col.find_one(
-        {"address": address},
-        {"_id": 0, "score": 1, "dex_volume": 1, "stake_duration_sec": 1, "total_sent_xian": 1}
-    ) or {}
+    doc = traits_col.find_one({"address": address}) or {}
+
+    score           = _first_num(doc, ["score"], 0)
+    stake_seconds   = _first_num(doc, ["stake_seconds", "stake_duration_sec"], 0)
+    dex_volume      = _first_num(doc, ["dex_volume"], 0)
+    pulse_influence = _first_num(doc, ["pulse_influence"], 0)
+    # 👇 tolerate all historical names you’ve used
+    tx_volume       = _first_num(doc, ["transaction_volume", "trx_volume", "total_sent_xian", "amount"], 0)
+    bridge_volume   = _first_num(doc, ["bridge_volume", "xian_bridged"], 0)
+    volume_played   = _first_num(doc, ["volume_played"], 0)
 
     return {
-        "Score":           as_int(doc.get("score", 0)),
-        "Stake Duration":  as_int(doc.get("stake_duration_sec", 0)),
-        "DEX Volume":      as_float(doc.get("dex_volume", 0.0)),
-        "Total Sent XIAN": as_float(doc.get("total_sent_xian", 0.0)),
+        "Score":              score,
+        "Tier":               derive_tier_label(score),
+        "Stake Duration":     stake_seconds,
+        "DEX Volume":         dex_volume,
+        "Pulse Influence":    pulse_influence,
+        "Transaction Volume": tx_volume,
+        "Bridge Volume":      bridge_volume,
+        "Volume Played":      volume_played,
     }
 
 def get_onchain_traits(address: str):
@@ -68,18 +123,24 @@ def get_onchain_traits(address: str):
     }
     r = requests.post(GRAPHQL_URL, json=q, timeout=20)
     r.raise_for_status()
-    edges = r.json().get("data", {}).get("allStates", {}).get("edges", []) or []
-    chain = {k: "" for k in TRAIT_KEYS}
+    edges = (r.json().get("data", {}) or {}).get("allStates", {}).get("edges", []) or []
+
+    out = {k: ("" if k == "Tier" else 0) for k in TRAIT_KEYS}
     for e in edges:
-        key_str = e["node"]["key"]  # e.g. con_sbt_traits.traits:ADDR:Score
+        key_str = e["node"]["key"]  # con_sbtxian.traits:ADDR:Trx Volume
         try:
             after = key_str.split(".traits:", 1)[1]
-            addr, trait_key = after.split(":", 1)
-            if trait_key in chain:
-                chain[trait_key] = e["node"]["value"]
+            addr, chain_key = after.split(":", 1)
+            if addr != address:
+                continue
+            ui_key = CHAIN_TO_UI.get(chain_key)
+            if not ui_key:
+                continue
+            val = e["node"]["value"]
+            out[ui_key] = (str(val) if ui_key == "Tier" else _to_num(val))
         except Exception:
             continue
-    return chain
+    return out
 
 # ---------- API ----------
 @app.get("/api/compare_traits")

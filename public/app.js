@@ -5,11 +5,20 @@ if (window.__SBT_APP_INIT__) {
   window.__SBT_APP_INIT__ = true;
 
   // ------- config -------
-  const CONTRACT     = "con_sbtxian";             // << your merged SBT+traits contract
+  const CONTRACT     = "con_sbtxian_v";             // << your merged SBT+traits contract
   const API_BASE     = "http://127.0.0.1:5000";   // Flask API
   const RPC_URL      = "https://testnet.xian.org";
-  const STAMP_LIMIT  = 25;                        // cap stamps for update_trait
-  const KEYS = ["Score","Tier","Stake Duration","DEX Volume", "Total Sent XIAN"];
+  const STAMP_LIMIT  = 500;                        // cap stamps for update_trait
+  const KEYS = [
+  "Score",
+  "Tier",
+  "Stake Duration",
+  "DEX Volume",
+  "Pulse Influence",
+  "Transaction Volume",  // new
+  "Bridge Volume",       // new
+  "Volume Played",
+];
 
   // ===== DOM =====
   const btnConnect = document.getElementById("btnConnect");
@@ -32,8 +41,9 @@ if (window.__SBT_APP_INIT__) {
 
   function iconForTrait(k){
     const map = {
-      "Score":"⚡", "Tier":"🏅", "Stake Duration":"⏳",
-      "DEX Volume":"📈"
+      "Score":"⚡","Tier":"🏅","Stake Duration":"⏳","DEX Volume":"📈",
+      "Pulse Influence":"🌐","Transaction Volume":"🔄","Bridge Volume":"🌉",
+      "Volume Played":"🎮"
     };
     return map[k] || "★";
   }
@@ -46,6 +56,7 @@ if (window.__SBT_APP_INIT__) {
     if (m) return `${m}m`;
     return `${n|0}s`;
   }
+
   function fmtNum(x, digits=2){
     const n = Number(x||0);
     return n.toLocaleString(undefined, { maximumFractionDigits: digits });
@@ -59,22 +70,29 @@ if (window.__SBT_APP_INIT__) {
     return v; // Score or anything else
   }
 
+  function isNumericKey(k){
+    return k !== "Tier";
+  }
+
+  function equalVals(k, a, b){
+    if (isNumericKey(k)) return Number(a || 0) === Number(b || 0);
+    return String(a ?? "") === String(b ?? "");
+  }
+
   function renderTable(data){
     const rows = [];
     rows.push(`<div class="tr h"><div>Trait</div><div>Off‑chain (DB)</div><div>On‑chain</div></div>`);
     let i = 0;
     for (const k of KEYS){
-      const rawDb = data.offchain?.[k];
-      const rawOn = data.onchain?.[k];
-      const dbv   = pretty(k, rawDb);
-      const onv   = pretty(k, rawOn);
-      const diff = (k === "Score") && String(dbv) !== String(onv);
+      const dbv = data.offchain?.[k] ?? (isNumericKey(k) ? 0 : "");
+      const onv = data.onchain?.[k] ?? (isNumericKey(k) ? 0 : "");
+      const diff = !equalVals(k, dbv, onv);
       rows.push(
-        `<div class="tr anim ${diff ? "diff" : ""}" style="--i:${i++}">
-           <div class="trait"><span class="ico">${iconForTrait(k)}</span>${k}</div>
-           <div>${dbv}</div>
-           <div>${onv}</div>
-         </div>`
+        `<div class="tr ${diff ? "diff" : ""}" style="--i:${i++}">
+          <div class="trait"><span class="ico">${iconForTrait(k)}</span>${k}</div>
+          <div>${dbv}</div>
+          <div>${onv}</div>
+        </div>`
       );
     }
     tableEl.innerHTML = rows.join("");
@@ -183,47 +201,44 @@ if (window.__SBT_APP_INIT__) {
     }
   }
 
+  const UI_TO_CHAIN = {
+    "Score": "Score",
+    "Tier": "Tier",
+    "Stake Duration": "Stake Duration",
+    "DEX Volume": "DEX Volume",
+    "Pulse Influence": "Pulse Influence",
+    "Transaction Volume": "Trx Volume",   // important
+    "Bridge Volume": "Xian Bridged",      // important
+    "Volume Played": "Volume Played",
+  };
+
   async function updateOnChain(e){
-    console.log("updateOnChain clicked");
     e?.preventDefault?.();
-
-    // strong debounce
-    const now = Date.now();
-    if (now - lastClickAt < 800) return;
-    lastClickAt = now;
-
-    if (updating) return;
-    if (!last || !last.address){ alert("Compare first."); return; }
-    if (!walletInfo){ await connectWallet(); if (!walletInfo) return; }
-
-    // STRICT: only the holder can update
+    if (!last || !walletInfo) return;
     if (walletInfo.address !== last.address){
-      alert(`Connected wallet ${walletInfo.address} does not match ${last.address}. Connect the correct wallet.`);
-      return;
+      alert("Connect the same wallet that owns this SBT."); return;
     }
 
-    const newScore = String(last.offchain?.Score ?? 0);
+    // derive tier from off‑chain score
+    const offScore = Number(last.offchain?.["Score"] || 0);
+    const derivedTier = tierFromScore(offScore).name;
 
-    try{
-      updating = true;
-      btnUpdate.disabled = true;
-      btnUpdate.style.pointerEvents = "none";
-      setStatus("Sending update_trait…");
-
-      const tx = await XianWalletUtils.sendTransaction(
-        CONTRACT, "update_trait", { key: "Score", value: newScore }, STAMP_LIMIT
-      );
-      console.log("update_trait tx status:", tx);
-
-      alert("Update submitted. Re‑checking in 2s…");
-      setTimeout(doCompare, 2000);
-    }catch(e){
-      console.error(e);
-      alert("Failed to send transaction. Confirm the wallet prompt and ensure you’re on testnet.");
-    }finally{
-      updating = false;
-      btnUpdate.style.pointerEvents = "";
+    const toSet = {};
+    for (const uiKey of KEYS){
+      const chainKey = UI_TO_CHAIN[uiKey] || uiKey;
+      const of = last.offchain?.[uiKey];
+      const oc = last.onchain?.[uiKey];
+      if (!equalVals(uiKey, of, oc)) {
+        toSet[chainKey] = String(of ?? "");
+      }
     }
+    toSet["Tier"] = derivedTier;
+
+    if (Object.keys(toSet).length === 0){ setStatus("Nothing to update."); return; }
+
+    console.log("update_traits payload ->", { batch: toSet }); // sanity
+    await XianWalletUtils.sendTransaction(CONTRACT, "update_traits", { batch: toSet });
+    setTimeout(doCompare, 1500);
   }
 
   // Wire up

@@ -29,7 +29,7 @@ from pymongo import MongoClient, ASCENDING  # pip install pymongo
 # Use env vars to flip between testnet/mainnet without touching code.
 WS_URL        = os.getenv("XIAN_WS_URL",  "ws://94.16.113.241:26657/websocket")  # mainnet: wss://node.xian.org/websocket
 GRAPHQL_URL   = os.getenv("GRAPHQL_URL",  "https://devnet.xian.org/graphql")  # mainnet: https://node.xian.org/graphql
-SBT_CONTRACT  = os.getenv("SBT_CONTRACT", "con_sbtxian")  # your merged SBT+traits contract name
+SBT_CONTRACT  = os.getenv("SBT_CONTRACT", "con_sbtxian_v")  # your merged SBT+traits contract name
 MONGO_URI     = os.getenv("MONGO_URI",    "mongodb://localhost:27017/")
 DB_NAME       = os.getenv("DB_NAME",      "xian_monitor")
 COLL_TRAITS   = os.getenv("COLL_TRAITS",  "traits")
