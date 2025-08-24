@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mint your SBT — 20 XIAN</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <meta name="color-scheme" content="dark light"/>
+  <style>
+    .tags{display:flex;gap:8px;align-items:center}
+    .tag{font-size:.8rem;padding:.25rem .5rem;border-radius:9999px;background:#2b2f3a66}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card enhanced" id="appCard">
+      <div class="top">
+        <h2 style="margin:0;font-weight:800;letter-spacing:.2px">Mint SBT</h2>
+        <div class="tags">
+          <span class="tag" id="netTag">network: testnet</span>
+          <span class="tag" id="addrTag">address: —</span>
+          <button class="btn" id="btnConnect">Connect Wallet</button>
+          <span class="price-chip">20 XIAN</span>
+        </div>
+      </div>
+
+      <div class="row mt">
+        <div class="col">
+          <label class="mini">Recipient (defaults to connected wallet)</label>
+          <input id="mintTo" class="input" placeholder="wallet address (leave empty to mint to connected)"/>
+        </div>
+      </div>
+
+      <div class="row mt3">
+        <button class="btn primary" id="btnMint">Mint for 20 XIAN</button>
+        <button class="btn" id="btnCheck">Check status</button>
+      </div>
+
+      <div id="mintStatus" class="muted" style="margin-top:10px">Click “Connect Wallet” to begin.</div>
+
+      <div class="note">
+        Notes:
+        <ul style="margin:6px 0 0 18px">
+          <li>Mint will fail if the recipient already holds an SBT.</li>
+          <li>You’ll confirm a couple of prompts in your wallet.</li>
+          <li>The SBT is non-transferable.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet bridge helper ONLY; do NOT import app.js on this page -->
+  <script src="./xian-wallet-utils.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    // ===== CONFIG =====
+    const CONTRACT         = 'con_sbtxian_v';     // deployed SBT contract
+    const CURRENCY         = 'currency';
+    const FEE_XIAN         = 20;
+    const TREASURY_ADDRESS = '77628b7eeb1e8c9e9d02036541af03c57ba5ee308741e46401769c5ff397d2b7'; // <-- set to a real 77… wallet
+
+    // ===== DOM =====
+    const btnConnect = document.getElementById('btnConnect');
+    const btnMint    = document.getElementById('btnMint');
+    const btnCheck   = document.getElementById('btnCheck');
+    const elTo       = document.getElementById('mintTo');
+    const elStatus   = document.getElementById('mintStatus');
+    const addrTag    = document.getElementById('addrTag');
+    const netTag     = document.getElementById('netTag');
+
+    // ===== STATE =====
+    let walletInfo  = null;
+    let pendingInfo = null; // coalesce concurrent wallet-info requests
+
+    // ===== HELPERS =====
+    const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+    const short = (a)=>a ? (a.slice(0,6)+'...'+a.slice(-4)) : '—';
+    function setStatus(msg, cls){
+      console.log('[mint]', msg);
+      elStatus.textContent = msg;
+      elStatus.classList.remove('error','success','live');
+      if (cls) elStatus.classList.add(cls);
+    }
+
+    // ---------- Wallet bootstrap ----------
+    XianWalletUtils.init('https://testnet.xian.org'); // installs xianReady/xianWalletInfo handlers
+
+    document.addEventListener('xianReady', () => {
+      setStatus('Wallet bridge ready. Click Connect.');
+    });
+
+    document.addEventListener('xianWalletInfo', (e) => {
+      const info = e.detail || {};
+      if (!info.address) return;
+      walletInfo = info;
+      window.__walletInfo = info; // cache
+      addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
+      netTag.textContent  = 'network: testnet';
+      if (!elTo.value) elTo.value = info.address;
+      btnConnect.style.display = 'none';
+      setStatus('Connected. You can mint now.');
+    });
+
+    async function requestInfoOnce(){
+      if (walletInfo)  return walletInfo;
+      if (pendingInfo) return pendingInfo;
+      pendingInfo = XianWalletUtils.requestWalletInfo().finally(()=>{ pendingInfo = null; });
+      return pendingInfo;
+    }
+
+    // Retry around the helper’s short timeout (permission prompts can take >2s)
+    async function ensureWalletInfo(maxMs=20000){
+      const start = Date.now();
+      let lastErr = null;
+      while (Date.now() - start < maxMs){
+        try{
+          const info = await requestInfoOnce();
+          if (info && info.address){ return info; }
+        }catch(e){ lastErr = e; }
+        await sleep(1000);
+      }
+      throw lastErr || new Error('Wallet not responding');
+    }
+
+    // ---------- GraphQL (multi-endpoint + timeout) ----------
+    const GQL_URLS = [
+      'https://testnet.xian.org/graphql',
+      'https://node.xian.org/graphql',
+      'https://devnet.xian.org/graphql'
+    ];
+
+    async function fetchGql(body, timeoutMs = 8000) {
+      const payload = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+      let lastErr;
+      for (const url of GQL_URLS) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), timeoutMs);
+          // 🔧 FIX: use the spread operator on payload
+          const res = await fetch(url, { ...payload, signal: ctrl.signal });
+          clearTimeout(t);
+          if (!res.ok) throw new Error(`HTTP ${res.status} at ${url}`);
+          const j = await res.json();
+          if (j.errors) throw new Error(`GraphQL error from ${url}: ${JSON.stringify(j.errors)}`);
+          return j;
+        } catch (e) {
+          lastErr = e;
+          console.warn('[gql]', url, e.message || e);
+        }
+      }
+      throw lastErr || new Error('All GraphQL endpoints failed.');
+    }
+
+
+    // EXACTLY your query shape:
+    // allStates(filter: { key: { like: "<CONTRACT>.sbt_holders:<ADDRESS>" } })
+    async function hasSbt(address) {
+      const key = `${CONTRACT}.sbt_holders:${String(address || '').trim().toLowerCase()}`;
+      const body = {
+        query: `query($k:String!){
+          allStates(filter:{ key:{ like:$k } }, first:1){
+            edges{ node{ key value } }
+          }
+        }`,
+        variables: { k: key }
+      };
+
+      // use a single endpoint to keep it simple and deterministic
+      const r = await fetch('https://devnet.xian.org/graphql', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      // if the endpoint fails, abort mint (don’t charge)
+      if (!r.ok) throw new Error(`GraphQL HTTP ${r.status}`);
+
+      const j = await r.json();
+      const edges = ((((j||{}).data||{}).allStates||{}).edges) || [];
+      if (!edges.length) return false;
+
+      const v = edges[0]?.node?.value;
+      // accept common serializations of boolean true
+      return v === true || v === 'true' || v === 'True' || v === 1;
+    }
+
+    // ---------- UI: Connect / Mint / Check ----------
+    btnConnect.addEventListener('click', async () => {
+      try{
+        setStatus('Connecting to wallet…','live');
+        const info = await ensureWalletInfo(); // interactive connect
+        if (info && info.address){
+          walletInfo = info; window.__walletInfo = info;
+          addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
+          netTag.textContent  = 'network: testnet';
+          if (!elTo.value) elTo.value = info.address;
+          btnConnect.style.display = 'none';
+        }
+        setStatus('Connected. You can mint now.');
+      }catch(e){
+        console.error(e);
+        setStatus('Wallet not detected or not responding. Make sure the Xian wallet is open, allowed on this site, and testnet is selected.','error');
+      }
+    });
+
+    btnMint.addEventListener('click', async (ev)=>{
+      ev.preventDefault();
+      try{
+        if (!TREASURY_ADDRESS || !TREASURY_ADDRESS.startsWith('77')){
+          alert('Set TREASURY_ADDRESS (a 77… wallet) in mint.html first.'); return;
+        }
+        const info = await ensureWalletInfo();
+        const to = (elTo.value || info.address || '').trim();
+        if (!to){ alert('Enter a recipient or connect wallet.'); return; }
+
+        // STRICT pre-check: if GraphQL cannot be reached, we abort (no payment).
+        setStatus('Checking if recipient already holds an SBT…','live');
+        const alreadyHas = await hasSbt(to);
+        if (alreadyHas){
+          setStatus('This address already holds an SBT — mint is not allowed.', 'error');
+          return;
+        }
+
+        btnMint.disabled = true; elTo.disabled = true;
+
+        setStatus('Step 1/2: sending 20 XIAN to treasury…','live');
+        const payRes = await XianWalletUtils.sendTransaction(CURRENCY, 'transfer', { amount: FEE_XIAN, to: TREASURY_ADDRESS });
+        if (payRes && payRes.errors) throw new Error('currency.transfer failed: '+JSON.stringify(payRes.errors));
+
+        setStatus('Step 2/2: finalizing mint…','live');
+        const mintRes = await XianWalletUtils.sendTransaction(CONTRACT, 'mint', { to, uri: to });
+        if (mintRes && mintRes.errors) throw new Error('mint failed: '+JSON.stringify(mintRes.errors));
+
+        // Verify on-chain (best effort)
+        setStatus('Mint submitted. Verifying on chain…','live');
+        for (let i=0;i<10;i++){
+          await sleep(1000);
+          try { if (await hasSbt(to)) { setStatus('✅ Mint confirmed!','success'); btnMint.disabled=false; elTo.disabled=false; return; } }
+          catch(_) { /* ignore transient GQL errors */ }
+        }
+        setStatus('Mint tx sent — awaiting finality. Use “Check status” shortly.','success');
+      }catch(err){
+        console.error('[mint] error', err);
+        setStatus(`Mint failed or was rejected: ${err && err.message ? err.message : String(err)}`,'error');
+      }finally{
+        btnMint.disabled = false; elTo.disabled = false;
+      }
+    });
+
+    // Status check reads only GraphQL; wallet is optional
+    btnCheck.addEventListener('click', async (ev)=>{
+      ev.preventDefault();
+      try{
+        const to = (elTo.value || walletInfo?.address || '').trim();
+        if (!to){ alert('Enter a recipient or connect wallet first.'); return; }
+        setStatus('Checking SBT status…','live');
+        const ok = await hasSbt(to);
+        setStatus(ok ? 'Recipient already holds an SBT.' : 'No SBT found for recipient.', ok ? 'success' : '');
+      }catch(err){
+        console.error('[status] error', err);
+        setStatus(`Could not check status: ${err && err.message ? err.message : String(err)}`,'error');
+      }
+    });
+
+    // If the wallet is already connected, fill quietly
+    (async () => {
+      try{
+        const info = await requestInfoOnce(); // coalesced; won’t spam the wallet
+        if (info?.address){
+          walletInfo = info; window.__walletInfo = info;
+          addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
+          netTag.textContent  = 'network: testnet';
+          if (!elTo.value) elTo.value = info.address;
+          btnConnect.style.display = 'none';
+          setStatus('Connected. You can mint now.');
+        }
+      }catch(_){}
+    })();
+
+  })();
+  </script>
+</body>
+</html>
