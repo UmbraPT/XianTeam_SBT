@@ -101,8 +101,11 @@ if (window.__SBT_APP_INIT__) {
 
   // Wallet bridge
   XianWalletUtils.init(RPC_URL);
-  document.addEventListener("xianReady", () => setStatus("Wallet bridge ready. Click Connect."));
-
+  //document.addEventListener("xianReady", () => setStatus("Wallet bridge ready. Click Connect."));
+  document.addEventListener("xianReady", () => {
+    if (statusEl) statusEl.textContent = "Wallet bridge ready. Click Connect.";
+  });
+  
   // -------- tiers & badges (jungle) --------
   function tierFromScore(score){
     const s = Number(score || 0);
@@ -137,6 +140,8 @@ if (window.__SBT_APP_INIT__) {
     try{
       const info = await XianWalletUtils.requestWalletInfo();
       walletInfo = info;
+      window.__walletInfo = info; // <-- cache globally for other scripts
+      
       addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
       netTag.textContent  = `network: testnet`;
       setStatus(`Connected: ${info.truncatedAddress || info.address}`);
