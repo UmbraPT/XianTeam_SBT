@@ -3,26 +3,108 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Mint your SBT — 20 XIAN</title>
-  <link rel="stylesheet" href="./style.css"/>
+  <title>Mint your SBT — The Only Token you need for Xian Network</title>
   <meta name="color-scheme" content="dark light"/>
+
+  <!-- Optional: keep your existing style.css; this file also ships with enhanced styles below -->
+  <link rel="stylesheet" href="./style.css"/>
   <style>
-    .tags{display:flex;gap:8px;align-items:center}
-    .tag{font-size:.8rem;padding:.25rem .5rem;border-radius:9999px;background:#2b2f3a66}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+    :root{
+      --bg: #0b0f17;            /* deep slate */
+      --card: rgba(255,255,255,.06);
+      --muted: #a6b0c3;
+      --text: #e7ecf5;
+      --accent: #7c5cff;        /* primary */
+      --accent-2: #17e2a1;      /* secondary */
+      --danger: #ff6b6b;
+      --success: #22c55e;
+      --border: rgba(255,255,255,.12);
+      --chip: rgba(124,92,255,.15);
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f7f8fb; --card:#ffffff; --text:#0b0f17; --muted:#5b667a; --border:#e7eaf0; --chip:rgba(124,92,255,.12); }
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial;
+      color:var(--text); background: radial-gradient(1200px 800px at 10% -10%, rgba(124,92,255,.15), transparent 60%),
+                         radial-gradient(1000px 700px at 90% 10%, rgba(23,226,161,.12), transparent 60%),
+                         var(--bg);
+    }
+
+    /* App bar */
+    .appbar{ position:sticky; top:0; z-index:10; backdrop-filter:saturate(120%) blur(8px);
+      background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,0)); border-bottom:1px solid var(--border);
+    }
+    .appbar-inner{ max-width:980px; margin:0 auto; padding:14px 16px; display:flex; align-items:center; gap:12px; justify-content:space-between }
+    .brand{ display:flex; gap:10px; align-items:center; font-weight:800; letter-spacing:.2px }
+    .brand-badge{ width:28px; height:28px; border-radius:12px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 4px 16px rgba(124,92,255,.35) }
+    .tags{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .tag{ font-size:.8rem; padding:.35rem .6rem; border:1px solid var(--border); border-radius:999px; color:var(--muted); background:rgba(255,255,255,.04) }
+    .btn{ padding:.55rem .9rem; border-radius:12px; border:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); color:var(--text);
+      transition:all .2s ease; cursor:pointer }
+    .btn:hover{ transform:translateY(-1px); box-shadow:0 8px 22px rgba(0,0,0,.25) }
+    .btn[disabled]{ opacity:.6; cursor:not-allowed; filter:saturate(.6) }
+    .btn.primary{ background:linear-gradient(180deg, var(--accent), #5b3bff); border-color:transparent }
+
+    /* Layout */
+    .container{ max-width:980px; margin:28px auto; padding:0 16px; display:grid; grid-template-columns: 1fr; gap:16px }
+    .hero{ padding:18px; border-radius:16px; border:1px solid var(--border); background:linear-gradient(180deg, rgba(124,92,255,.08), rgba(255,255,255,.02)); }
+    .flow{ display:flex; align-items:center; gap:8px; color:var(--muted); font-size:.9rem }
+    .arrow{ opacity:.5 }
+
+    .card{ padding:18px; border-radius:20px; border:1px solid var(--border); background:var(--card); box-shadow:0 10px 40px rgba(0,0,0,.15) }
+    .card.enhanced{ position:relative; overflow:hidden }
+    .card.enhanced:before{ content:""; position:absolute; inset:-1px; pointer-events:none; border-radius:20px; background:radial-gradient(400px 120px at 20% -20%, rgba(124,92,255,.18), transparent 60%), radial-gradient(260px 90px at 90% 10%, rgba(23,226,161,.14), transparent 60%) }
+
+    .row{ display:flex; gap:12px; align-items:center }
+    .col{ flex:1 }
+    .mt{ margin-top:12px } .mt2{ margin-top:16px } .mt3{ margin-top:20px }
+
+    .mini{ display:block; font-size:.8rem; color:var(--muted); margin:0 0 6px 2px }
+    .input{ width:100%; padding:.8rem .9rem; border-radius:14px; border:1px solid var(--border); background:rgba(0,0,0,.2); color:var(--text);
+      outline:none; transition:border .2s ease, box-shadow .2s ease }
+    .input:focus{ border-color: rgba(124,92,255,.6); box-shadow:0 0 0 4px rgba(124,92,255,.15) }
+
+    .price-chip{ font-weight:700; color:#f5f3ff; background:var(--chip); border:1px solid rgba(124,92,255,.4); padding:.35rem .6rem; border-radius:10px }
+    .note{ margin-top:14px; font-size:.9rem; color:var(--muted) }
+
+    /* Status pill */
+    #mintStatus{ margin-top:10px; border:1px solid var(--border); border-radius:12px; padding:.6rem .75rem; color:var(--muted); background:rgba(255,255,255,.04) }
+    #mintStatus.live{ color:#e3e8ff }
+    #mintStatus.error{ color:#fff; background:rgba(255,107,107,.12); border-color:rgba(255,107,107,.35) }
+    #mintStatus.success{ color:#eafff4; background:rgba(34,197,94,.14); border-color:rgba(34,197,94,.35) }
+
+    footer{ max-width:980px; margin:24px auto 40px; padding:0 16px; color:var(--muted); font-size:.9rem }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card enhanced" id="appCard">
-      <div class="top">
+  <!-- App bar -->
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand"><span class="brand-badge"></span> <span>Xian SBT</span></div>
+      <div class="tags">
+        <span class="tag" id="netTag">network: testnet</span>
+        <span class="tag" id="addrTag">address: —</span>
+        <button class="btn" id="btnConnect">Connect Wallet</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Intro / explainer -->
+    <section class="hero">
+      <h1 style="margin:0 0 6px 0">Mint your SBT</h1>
+      <p class="muted" style="margin:0 0 10px 0">One‑click mint. We’ll handle the steps — you confirm in your wallet and your SBT shows up.</p>
+      <div class="flow" aria-label="Mint flow"><span class="step">Mint</span><span class="arrow">→</span><span class="step">Use the network</span><span class="arrow">→</span><span class="step">Verify</span></div>
+    </section>
+
+    <!-- Mint card -->
+    <section class="card enhanced" id="appCard">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <h2 style="margin:0;font-weight:800;letter-spacing:.2px">Mint SBT</h2>
-        <div class="tags">
-          <span class="tag" id="netTag">network: testnet</span>
-          <span class="tag" id="addrTag">address: —</span>
-          <button class="btn" id="btnConnect">Connect Wallet</button>
-          <span class="price-chip">20 XIAN</span>
-        </div>
+        <span class="price-chip">20 XIAN</span>
       </div>
 
       <div class="row mt">
@@ -40,29 +122,32 @@
       <div id="mintStatus" class="muted" style="margin-top:10px">Click “Connect Wallet” to begin.</div>
 
       <div class="note">
-        Notes:
         <ul style="margin:6px 0 0 18px">
           <li>Mint will fail if the recipient already holds an SBT.</li>
           <li>You’ll confirm a couple of prompts in your wallet.</li>
-          <li>The SBT is non-transferable.</li>
+          <li>The SBT is non‑transferable.</li>
         </ul>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
+
+  <footer>
+    Need help? If the wallet doesn’t appear, ensure the Xian wallet extension is allowed on this site and **testnet** is selected.
+  </footer>
 
   <!-- Wallet bridge helper ONLY; do NOT import app.js on this page -->
   <script src="./xian-wallet-utils.js"></script>
   <script>
-  (function () {
+  (function(){
     'use strict';
 
-    // ===== CONFIG =====
+    // ===== CONFIG (keep these the same) =====
     const CONTRACT         = 'con_sbtxian_v';     // deployed SBT contract
     const CURRENCY         = 'currency';
     const FEE_XIAN         = 20;
     const TREASURY_ADDRESS = '77628b7eeb1e8c9e9d02036541af03c57ba5ee308741e46401769c5ff397d2b7'; // <-- set to a real 77… wallet
 
-    // ===== DOM =====
+    // ===== DOM (IDs unchanged so your current workflow keeps working) =====
     const btnConnect = document.getElementById('btnConnect');
     const btnMint    = document.getElementById('btnMint');
     const btnCheck   = document.getElementById('btnCheck');
@@ -79,14 +164,13 @@
     const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
     const short = (a)=>a ? (a.slice(0,6)+'...'+a.slice(-4)) : '—';
     function setStatus(msg, cls){
-      console.log('[mint]', msg);
       elStatus.textContent = msg;
       elStatus.classList.remove('error','success','live');
       if (cls) elStatus.classList.add(cls);
     }
 
     // ---------- Wallet bootstrap ----------
-    XianWalletUtils.init('https://testnet.xian.org'); // installs xianReady/xianWalletInfo handlers
+    XianWalletUtils.init('https://testnet.xian.org');
 
     document.addEventListener('xianReady', () => {
       setStatus('Wallet bridge ready. Click Connect.');
@@ -100,6 +184,7 @@
       addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
       netTag.textContent  = 'network: testnet';
       if (!elTo.value) elTo.value = info.address;
+      btnConnect.classList.add('hidden');
       btnConnect.style.display = 'none';
       setStatus('Connected. You can mint now.');
     });
@@ -111,7 +196,6 @@
       return pendingInfo;
     }
 
-    // Retry around the helper’s short timeout (permission prompts can take >2s)
     async function ensureWalletInfo(maxMs=20000){
       const start = Date.now();
       let lastErr = null;
@@ -125,65 +209,16 @@
       throw lastErr || new Error('Wallet not responding');
     }
 
-    // ---------- GraphQL (multi-endpoint + timeout) ----------
-    const GQL_URLS = [
-      'https://testnet.xian.org/graphql',
-      'https://node.xian.org/graphql',
-      'https://devnet.xian.org/graphql'
-    ];
-
-    async function fetchGql(body, timeoutMs = 8000) {
-      const payload = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
-      let lastErr;
-      for (const url of GQL_URLS) {
-        try {
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), timeoutMs);
-          // 🔧 FIX: use the spread operator on payload
-          const res = await fetch(url, { ...payload, signal: ctrl.signal });
-          clearTimeout(t);
-          if (!res.ok) throw new Error(`HTTP ${res.status} at ${url}`);
-          const j = await res.json();
-          if (j.errors) throw new Error(`GraphQL error from ${url}: ${JSON.stringify(j.errors)}`);
-          return j;
-        } catch (e) {
-          lastErr = e;
-          console.warn('[gql]', url, e.message || e);
-        }
-      }
-      throw lastErr || new Error('All GraphQL endpoints failed.');
-    }
-
-
-    // EXACTLY your query shape:
-    // allStates(filter: { key: { like: "<CONTRACT>.sbt_holders:<ADDRESS>" } })
-    async function hasSbt(address) {
-      const key = `${CONTRACT}.sbt_holders:${String(address || '').trim().toLowerCase()}`;
-      const body = {
-        query: `query($k:String!){
-          allStates(filter:{ key:{ like:$k } }, first:1){
-            edges{ node{ key value } }
-          }
-        }`,
-        variables: { k: key }
-      };
-
-      // use a single endpoint to keep it simple and deterministic
-      const r = await fetch('https://devnet.xian.org/graphql', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      // if the endpoint fails, abort mint (don’t charge)
+    // ---------- GraphQL (reads node.value === true) ----------
+    const GQL_URL = 'https://devnet.xian.org/graphql';
+    async function hasSbt(address){
+      const q = `query {\n        allStates(filter: { key: { like: "${CONTRACT}.sbt_holders:${address}" } }, first: 1) {\n          edges { node { key value } }\n        }\n      }`;
+      const r = await fetch(GQL_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ query: q }) });
       if (!r.ok) throw new Error(`GraphQL HTTP ${r.status}`);
-
       const j = await r.json();
-      const edges = ((((j||{}).data||{}).allStates||{}).edges) || [];
+      const edges = (((j||{}).data||{}).allStates||{}).edges || [];
       if (!edges.length) return false;
-
-      const v = edges[0]?.node?.value;
-      // accept common serializations of boolean true
+      const v = edges[0] && edges[0].node ? edges[0].node.value : undefined;
       return v === true || v === 'true' || v === 'True' || v === 1;
     }
 
@@ -191,7 +226,7 @@
     btnConnect.addEventListener('click', async () => {
       try{
         setStatus('Connecting to wallet…','live');
-        const info = await ensureWalletInfo(); // interactive connect
+        const info = await ensureWalletInfo();
         if (info && info.address){
           walletInfo = info; window.__walletInfo = info;
           addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
@@ -209,23 +244,16 @@
     btnMint.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       try{
-        if (!TREASURY_ADDRESS || !TREASURY_ADDRESS.startsWith('77')){
-          alert('Set TREASURY_ADDRESS (a 77… wallet) in mint.html first.'); return;
-        }
+        if (!TREASURY_ADDRESS || TREASURY_ADDRESS.startsWith('PUT_')){ alert('Set TREASURY_ADDRESS (77… wallet) first.'); return; }
         const info = await ensureWalletInfo();
         const to = (elTo.value || info.address || '').trim();
         if (!to){ alert('Enter a recipient or connect wallet.'); return; }
 
-        // STRICT pre-check: if GraphQL cannot be reached, we abort (no payment).
         setStatus('Checking if recipient already holds an SBT…','live');
         const alreadyHas = await hasSbt(to);
-        if (alreadyHas){
-          setStatus('This address already holds an SBT — mint is not allowed.', 'error');
-          return;
-        }
+        if (alreadyHas){ setStatus('This address already holds an SBT — mint is not allowed.','error'); return; }
 
         btnMint.disabled = true; elTo.disabled = true;
-
         setStatus('Step 1/2: sending 20 XIAN to treasury…','live');
         const payRes = await XianWalletUtils.sendTransaction(CURRENCY, 'transfer', { amount: FEE_XIAN, to: TREASURY_ADDRESS });
         if (payRes && payRes.errors) throw new Error('currency.transfer failed: '+JSON.stringify(payRes.errors));
@@ -234,13 +262,8 @@
         const mintRes = await XianWalletUtils.sendTransaction(CONTRACT, 'mint', { to, uri: to });
         if (mintRes && mintRes.errors) throw new Error('mint failed: '+JSON.stringify(mintRes.errors));
 
-        // Verify on-chain (best effort)
         setStatus('Mint submitted. Verifying on chain…','live');
-        for (let i=0;i<10;i++){
-          await sleep(1000);
-          try { if (await hasSbt(to)) { setStatus('✅ Mint confirmed!','success'); btnMint.disabled=false; elTo.disabled=false; return; } }
-          catch(_) { /* ignore transient GQL errors */ }
-        }
+        for (let i=0;i<10;i++){ await sleep(1000); try{ if (await hasSbt(to)){ setStatus('✅ Mint confirmed!','success'); btnMint.disabled=false; elTo.disabled=false; return; } }catch(_){} }
         setStatus('Mint tx sent — awaiting finality. Use “Check status” shortly.','success');
       }catch(err){
         console.error('[mint] error', err);
@@ -250,7 +273,6 @@
       }
     });
 
-    // Status check reads only GraphQL; wallet is optional
     btnCheck.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       try{
@@ -266,19 +288,7 @@
     });
 
     // If the wallet is already connected, fill quietly
-    (async () => {
-      try{
-        const info = await requestInfoOnce(); // coalesced; won’t spam the wallet
-        if (info?.address){
-          walletInfo = info; window.__walletInfo = info;
-          addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`;
-          netTag.textContent  = 'network: testnet';
-          if (!elTo.value) elTo.value = info.address;
-          btnConnect.style.display = 'none';
-          setStatus('Connected. You can mint now.');
-        }
-      }catch(_){}
-    })();
+    (async () => { try{ const info = await requestInfoOnce(); if (info?.address){ walletInfo = info; window.__walletInfo = info; addrTag.textContent = `address: ${info.truncatedAddress || short(info.address)}`; netTag.textContent = 'network: testnet'; if (!elTo.value) elTo.value = info.address; btnConnect.style.display = 'none'; setStatus('Connected. You can mint now.'); } }catch(_){} })();
 
   })();
   </script>
